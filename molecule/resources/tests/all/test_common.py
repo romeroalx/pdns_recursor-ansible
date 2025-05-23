@@ -2,6 +2,7 @@ import os
 import yaml
 import pytest
 import testinfra.utils.ansible_runner
+import re
 
 
 testinfra_hosts = testinfra.utils.ansible_runner.AnsibleRunner(
@@ -79,3 +80,24 @@ def test_config(host, AnsibleVars):
         assert fr.user == 'root'
         assert fr.group == AnsibleVars['default_pdns_rec_group']
         assert fr.mode == 0o640
+
+def test_dns_resolution(host):
+  domain = "example.org"
+
+  # Test A record
+  command = f"dig @127.0.0.1 {domain} A"
+  result = host.run(command)
+
+  assert result.rc == 0
+  assert "status: NOERROR" in result.stdout
+  # search for a valid A record in the response
+  assert re.search(rf"{domain}\.\s+\d+\s+IN\s+A\s+([0-9.]+)", result.stdout)
+
+  # Test AAAA record
+  command = f"dig @127.0.0.1 {domain} AAAA"
+  result = host.run(command)
+
+  assert result.rc == 0
+  assert "status: NOERROR" in result.stdout
+  # search for a valid AAAA record in the response
+  assert re.search(rf"{domain}\.\s+\d+\s+IN\s+AAAA\s+([0-9a-zA-Z:]+)", result.stdout)
